@@ -103,28 +103,3 @@ class FugaContainer(object):
     @staticmethod
     def list_functions():
         return [x for x in dir(FugaContainer) if not x.startswith("_")]
-
-
-if __name__ == "__main__":
-
-    # ACCESS_KEY = '29aba3ce5c70426084844bc10e2dd86b'
-    # SECRET_KEY = 'b6274b5c96cc40639151ada6bac03833'
-
-    # fuga = FugaContainer(ACCESS_KEY, SECRET_KEY)
-    # fuga.set_container('flask-test-wauw')
-    # print(fuga)
-
-    # print(FugaContainer.list_functions())
-
-    # print(dir(fuga))
-    # fuga.upload_file('/home/thomas/Python/django-test/static/netecht.png')
-    # fuga.upload_file('/home/thomas/Downloads/Microsoft Office 97 Professional (ISO).7z')
-    # fuga.upload_file('/home/thomas/Git/blade-bootstrap/blade/run_tests.sh')
-    # print(fuga.get_files())
-    # print(fuga.delete_file('netecht.png'))
-    # print(fuga.get_file('netecht.png'))
-    # print(fuga.save_file('netecht.png'))
-    # print(fuga.list_files('flask-test-wauw'))
-
-
-    pass
