@@ -1,6 +1,6 @@
 Python Object to connect to the Fuga ObjectStore. With the basic CRUD methods. Use the static function 'FugaContainer.list_functions()' to get the available functions, or just read the python file.
 
-To get started, download the file or copy paste it in your project and then:
+To get started, download the file or copy paste it in your project, install the requirements.txt and then:
 
 ```python
 from object_store_object import FugaContainer
