@@ -71,6 +71,16 @@ class FugaContainer(object):
             return file
         raise AttributeError('File not found')
 
+    def post_file(self, file, container_name=None):
+        """file is the file returned by the flask method 'request.files' of type 'werkzeug.datastructures.FileStorage'"""
+        container = self._fetch_container(container_name)
+        name = file.filename
+        if name == "":
+            raise AttributeError('File not found')
+        k = container.new_key(name)
+        k.set_contents_from_file(file)
+        return 'success'
+
     def delete_file(self, filename, container_name=None):
         container = self._fetch_container(container_name)
         if filename in [x.name for x in container.list()]:

@@ -24,6 +24,7 @@ class MockFile(object):
 
     def __init__(self, value):
         self.name = value
+        self.filename = value
 
     def delete(self):
         pass
@@ -104,9 +105,9 @@ def test_list_all_the_functions():
 
     assert set(FugaContainer.list_functions()) == {'delete_file', 'get_container',
                                                    'get_file', 'get_files',
-                                                   'list_functions', 'save_file', 
-                                                   'set_container', 'upload_file', 
-                                                   'list_files'}
+                                                   'list_functions', 'post_file',
+                                                   'save_file', 'set_container', 
+                                                   'upload_file', 'list_files'}
 
 @patch('object_store_object.boto')
 def test_fuga_container_repr_function(mock_boto):
@@ -241,3 +242,29 @@ def test_get_files_with_limit(mock_boto):
 
     assert len(fuga.get_files(limit=2)) == 2
 
+@patch('object_store_object.boto')
+def test_post_file(mock_boto):
+    fuga = FugaContainer("", "")
+
+    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
+    mock_connect = Mock()
+    mock_connect.get_bucket.side_effect = lambda x: mock_connection
+    mock_boto.connect_s3.return_value = mock_connect
+    fuga.set_container("")
+
+    new_file = MockFile('testintest')
+    assert fuga.post_file(new_file) == 'success'
+
+@patch('object_store_object.boto')
+def test_post_file_without_name_raises_attribute_error(mock_boto):
+    fuga = FugaContainer("", "")
+
+    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
+    mock_connect = Mock()
+    mock_connect.get_bucket.side_effect = lambda x: mock_connection
+    mock_boto.connect_s3.return_value = mock_connect
+    fuga.set_container("")
+
+    new_file = MockFile('')
+    with pytest.raises(AttributeError):
+        fuga.post_file(new_file)
