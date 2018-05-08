@@ -35,5 +35,5 @@ fuga.save_file("file-from-object-store")
 Run the tests with coverage report:
 
 ```bash
-pytest --cov-report=html --cov
+PYTHONPATH=. pytest --cov-report=html --cov
 ```
