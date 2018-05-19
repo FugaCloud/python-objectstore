@@ -110,6 +110,16 @@ class FugaContainer(object):
             return base_repr
         return "{} with container {}".format(base_repr, self.container)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.access_key = None
+        self.secret_key = None
+        self.container.connection.close()
+        self.container = None
+        return True
+
     @staticmethod
     def list_functions():
         return [x for x in dir(FugaContainer) if not x.startswith("_")]
