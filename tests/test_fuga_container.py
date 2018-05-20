@@ -9,7 +9,7 @@ class MockConnectionReturnValue(object):
     def __init__(self, listvalue):
         self.listvalue = listvalue
         self.connection = MockFile("")
-        
+
     def list(self):
         return self.listvalue
 
@@ -286,3 +286,5 @@ def test_contextmanager_connection(mock_boto):
         fuga.set_container("testing")
 
     assert fuga.container is None
+    assert fuga.secret_key is None
+    assert fuga.access_key is None
