@@ -3,7 +3,6 @@ from os.path import basename
 
 import boto
 import boto.s3.connection
-from boto.s3.key import Key
 
 
 class FugaContainer(object):
@@ -22,10 +21,7 @@ class FugaContainer(object):
             container = self.get_container(container_name)
         return container
 
-    def get_container(self, container_name):
-        return self.set_container(container_name, set_object=False)
-
-    def set_container(self, container_name, set_object=True):
+    def _make_connection_to_object_store(self, container_name, set_object):
         conn = boto.connect_s3(
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
@@ -34,10 +30,19 @@ class FugaContainer(object):
             calling_format=boto.s3.connection.OrdinaryCallingFormat(),
         )
         container = conn.get_bucket(container_name)
+
         if set_object:
             self.container = container
-        return container
+        else:
+            return container
 
+    def get_container(self, container_name):
+        return self._make_connection_to_object_store(container_name,
+                                                     set_object=False)
+
+    def set_container(self, container_name):
+        self._make_connection_to_object_store(container_name,
+                                              set_object=True)
 
     def upload_file(self, file, container_name=None):
         container = self._fetch_container(container_name)
@@ -51,9 +56,7 @@ class FugaContainer(object):
         container = self._fetch_container(container_name)
 
         for i, key in enumerate(container.list()):
-            file = key.get_contents_as_string()
-            if not return_binary:
-                file = base64.b64encode(file).decode("utf-8")
+            file = self.get_file(key.name)
             files.update({key.name: file})
 
             if limit is not None:
@@ -69,14 +72,16 @@ class FugaContainer(object):
             if not return_binary:
                 file = base64.b64encode(file).decode("utf-8")
             return file
-        raise AttributeError('File not found')
+        raise AttributeError(
+            'File {} not found in {}'.format(filename, container))
 
     def post_file(self, file, container_name=None):
-        """file is the file returned by the flask method 'request.files' of type 'werkzeug.datastructures.FileStorage'"""
+        """file is the file returned by the flask method 'request.files'
+        of type 'werkzeug.datastructures.FileStorage'"""
         container = self._fetch_container(container_name)
         name = file.filename
         if name == "":
-            raise AttributeError('File not found')
+            raise AttributeError('File not found in the flask request')
         k = container.new_key(name)
         k.set_contents_from_file(file)
         return 'success'
@@ -91,7 +96,8 @@ class FugaContainer(object):
         raise AttributeError('File not found')
 
     def save_file(self, filename, container_name=None):
-        """saves the 'filename' from the container to 'filename' on the local computer"""
+        """saves the 'filename' from the container
+         to 'filename' on the local computer"""
         container = self._fetch_container(container_name)
         file = self.get_file(filename, container, return_binary=True)
         with open(filename, 'wb') as f:
@@ -104,8 +110,8 @@ class FugaContainer(object):
         return [x.name for x in container.list()]
 
     def __repr__(self):
-        base_repr = "FugaContainer(access_key={}, secret_key=<secret_key>)".format(
-            self.access_key)
+        base_repr = ("FugaContainer(access_key={},"
+                     " secret_key=<secret_key>)".format(self.access_key))
         if self.container is None:
             return base_repr
         return "{} with container {}".format(base_repr, self.container)
@@ -116,8 +122,9 @@ class FugaContainer(object):
     def __exit__(self, *exc):
         self.access_key = None
         self.secret_key = None
-        self.container.connection.close()
-        self.container = None
+        if self.container is not None:
+            self.container.connection.close()
+            self.container = None
         return True
 
     @staticmethod
