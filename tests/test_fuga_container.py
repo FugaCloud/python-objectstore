@@ -8,6 +8,7 @@ class MockConnectionReturnValue(object):
 
     def __init__(self, listvalue):
         self.listvalue = listvalue
+        self.connection = MockFile("")
 
     def list(self):
         return self.listvalue
@@ -33,6 +34,9 @@ class MockFile(object):
         return bytes([0,0,0,0,0,0,0,0,0,0,0,0,0])
 
     def set_contents_from_file(self, *args, **kwargs):
+        pass
+
+    def close(self):
         pass
 
 @pytest.mark.skip
@@ -268,3 +272,19 @@ def test_post_file_without_name_raises_attribute_error(mock_boto):
     new_file = MockFile('')
     with pytest.raises(AttributeError):
         fuga.post_file(new_file)
+
+
+@patch('object_store_object.boto')
+def test_contextmanager_connection(mock_boto):
+    fuga = FugaContainer("", "")
+
+    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
+    mock_connect = Mock()
+    mock_connect.get_bucket.side_effect = lambda x: mock_connection
+    mock_boto.connect_s3.return_value = mock_connect
+    with FugaContainer("", "") as fuga:
+        fuga.set_container("testing")
+
+    assert fuga.container is None
+    assert fuga.secret_key is None
+    assert fuga.access_key is None
