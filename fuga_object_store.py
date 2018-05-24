@@ -3,11 +3,8 @@ import boto
 import boto.s3.connection
 import base64
 import os.path
-ACCESS_KEY = '29aba3ce5c70426084844bc10e2dd86b'
-SECRET_KEY = 'b6274b5c96cc40639151ada6bac03833'
 
-
-class FugaObjectStore(object):
+class FugaInterface(object):
     """Class to interact with the Fuga Object Store."""
     def __init__(self, fuga_container):
         try:
@@ -112,23 +109,17 @@ class FugaContainer(object):
         self.secret_key = None
         if self.connection is not None:
             self.close_connection()
-        return True
 
 
-if __name__ == "__main__":
-    # with FugaContainer(ACCESS_KEY, SECRET_KEY) as fuga:
-    #     fuga.make_connection('flask-test-wauw')
-    #     print(FugaInteract(fuga).list_files())
+class FugaObjectStore(FugaInterface):
 
-    container = FugaContainer(ACCESS_KEY, SECRET_KEY, 'flask-test-wauw')
-    fuga = FugaObjectStore(container)
-    print(fuga.list())
-    # print(fuga.get('cysologo.png'))
+    def __init__(self, access_key, secret_key, container_name=None):
+        cont = FugaContainer(access_key, secret_key, container_name=container_name)  
+        self.fuga_interface = FugaInterface(cont)
+        self.fuga_container = cont
 
-    with open("/home/thomas/Overig/TEAM A - Scrum statistieken.xlsx", "rb") as file:
-        pass
-        # fuga.upload(file, "kaas/baas.txt")
-        # fuga.upload(file, "harry.xlsx")
-    with open("/home/thomas/Videos/Blue_Particle_Motion_Background_1080.mov", "wb") as file:
-        # fuga.download(file)
-        pass
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.fuga_container.__exit__(*exc)
