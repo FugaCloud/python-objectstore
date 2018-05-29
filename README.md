@@ -2,7 +2,7 @@
 
 A collection of Python Objects to connect to the Fuga ObjectStore. It is a small wrapper around boto. 
 
-To get started, download the file or copy paste it in your project, install the requirements.txt and then:
+To get started, download the 'fuga_object_store.py' file or copy paste it in your project, install the requirements.txt and then:
 
 ```python
 from fuga_object_store import FugaObjectStore
@@ -15,7 +15,7 @@ with FugaObjectStore(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
 
 ```
 
-This will list all the files in your container. You will now be able to get en delete files from your Container with:
+This will list all the files in your container. You will now be able to get and delete files from your Container with:
 
 ```python
 with FugaObjectStore(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
@@ -24,7 +24,7 @@ with FugaObjectStore(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
     print(fuga.delete('filename'))
 ```
 
-The 'get' method will return the binary contents of the file and encode it as hexadecimal number, this can be embedded in a html page. With the return_hex flag to False this method will return raw bytes.
+The 'get' method will return the binary contents of the file and encode it as a hexadecimal number, this can be embedded in a html page. With the return_hex flag to False this method will return a bytes object.
 There are methods for uploading and downloading files. These will need a file-like object to save or load from. For example:
 
 ```python

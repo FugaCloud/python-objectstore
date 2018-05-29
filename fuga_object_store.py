@@ -4,13 +4,16 @@ import boto.s3.connection
 import base64
 import os.path
 
+
 class FugaInterface(object):
     """Class to interact with the Fuga Object Store."""
+
     def __init__(self, fuga_container):
         try:
             if fuga_container.connection is None:
                 raise ValueError(
-                    'Make sure that fuga_container is connected to a container')
+                    'Make sure that fuga_container '
+                    'is connected to a container')
         except AttributeError:
             raise AttributeError(
                 'fuga_container object has to have a connection attribute')
@@ -27,12 +30,14 @@ class FugaInterface(object):
 
     def get(self, filename, return_hex=True):
         """return the 'filename' from the container.
-        If the return_hex flag is True (default) return the contents as hexadecimal binairy, 
-        if the return_hex flag is False return standard python binairy"""
+        If the return_hex flag is True (default)
+        return the contents as hexadecimal binary,
+        if the return_hex flag is False return standard python binary"""
         key = self._connection.get_key(filename)
         if key is None:
             raise AttributeError(
-                'File {} not found in {}'.format(filename, self.fuga_container))
+                'File {} not found in {}'.format(filename,
+                                                 self.fuga_container))
         bin_file = key.get_contents_as_string()
         if return_hex:
             bin_file = base64.b64encode(bin_file).decode("utf-8")
@@ -45,7 +50,8 @@ class FugaInterface(object):
         return "'{}' deleted".format(filename)
 
     def upload(self, file, save_as=None):
-        """upload the contents of local 'file' to 'basename(file.name)' or to 'save_as' in the container"""
+        """upload the contents of local 'file' to 'basename(file.name)'
+        or to 'save_as' in the container"""
         if 'b' not in file.mode:
             raise IOError('Use a binairy file to upload from')
 
@@ -58,7 +64,9 @@ class FugaInterface(object):
         return 'success'
 
     def download(self, file, load_from=None):
-        """download the contents from the container with the name 'basename(file.name)' or 'load_from' from the container to 'file' on the local computer"""
+        """download the contents from the container with the name
+        'basename(file.name)' or 'load_from' from the container
+        to 'file' on the local computer"""
         if 'b' not in file.mode:
             raise IOError('Use a binairy file to download to')
 
@@ -72,7 +80,9 @@ class FugaInterface(object):
 
 
 class FugaContainer(object):
-    """Class to make a connection to the Fuga Object Store with a given container"""
+    """Class to make a connection to the Fuga Object Store
+     with a given container"""
+
     def __init__(self, access_key, secret_key, container_name=None):
         self.access_key = access_key
         self.secret_key = secret_key
@@ -82,6 +92,7 @@ class FugaContainer(object):
             self.make_connection(container_name)
 
     def make_connection(self, container_name):
+        """make connection to given container"""
         conn = boto.connect_s3(
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
@@ -92,6 +103,7 @@ class FugaContainer(object):
         self.connection = conn.get_bucket(container_name)
 
     def close_connection(self):
+        """close connection to container"""
         self.connection.connection.close()
         self.connection = None
 
@@ -112,9 +124,21 @@ class FugaContainer(object):
 
 
 class FugaObjectStore(FugaInterface):
+    """FugaObjectStore context manager. 
+    Makes it easier to connect to the Fuga ObjectStore. 
+    Example:
+
+    with FugaObjectStore(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
+        with open("local/path/where/file-to-upload-to-objectstore", 'rb') as f:
+            fuga.upload(f)
+
+        with open("local/path/where/file-to-download-from-objectstore", 'wb') as f:
+            fuga.download(f, load_from='file-to-download-from-objectstore')
+    """ # noqa
 
     def __init__(self, access_key, secret_key, container_name=None):
-        cont = FugaContainer(access_key, secret_key, container_name=container_name)  
+        cont = FugaContainer(access_key, secret_key,
+                             container_name=container_name)
         self.fuga_interface = FugaInterface(cont)
         self.fuga_container = cont
 

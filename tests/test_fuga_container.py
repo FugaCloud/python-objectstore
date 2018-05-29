@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from fuga_object_store import FugaContainer, FugaInterface, FugaObjectStore
 from io import BytesIO
 
+
 class MockConnectionReturnValue(object):
 
     def __init__(self, listvalue):
@@ -48,12 +49,14 @@ def connecting_s3():
     )
     return Mock(get_bucket=lambda x: mock_connection)
 
+
 @pytest.fixture
 def fuga_container(monkeypatch, connecting_s3):
     monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
     fuga = FugaContainer("1", "2", "testing")
     fuga.connection = connecting_s3.get_bucket("")
     return fuga
+
 
 def test_connection_is_none_when_not_given():
     fuga = FugaContainer("", "")
@@ -74,7 +77,8 @@ def test_context_manager_deletes_keys_without_container():
     assert fuga.access_key is None
 
 
-def test_context_manager_deletes_keys_with_container(monkeypatch, connecting_s3):
+def test_context_manager_deletes_keys_with_container(monkeypatch,
+                                                     connecting_s3):
     monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
 
     with FugaContainer("1", "2", "") as fuga:
@@ -142,7 +146,7 @@ def test_download_file_success(fuga_container):
     with BytesIO(b'') as f:
         f.mode = 'wb'
         FugaInterface(fuga_container).download(f, load_from='1') == 'success'
-        f.name='2'
+        f.name = '2'
         FugaInterface(fuga_container).download(f) == 'success'
 
 
@@ -158,7 +162,7 @@ def test_get_file_fails_on_not_existing(fuga_container):
         FugaInterface(fuga_container).get('testing')
 
 
-def test_interface_init_fails_when_connection_attribute_is_none(fuga_container):
+def test_interface_init_fail_when_connection_attribute_is_none(fuga_container):
     fuga_container.connection = None
     with pytest.raises(ValueError):
         FugaInterface(fuga_container)
@@ -172,12 +176,13 @@ def test_interface_init_fails_without_connection_attribute():
 def test_object_store_works(monkeypatch, connecting_s3):
     monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
 
-    with FugaObjectStore("1","2", "testing") as fuga:
+    with FugaObjectStore("1", "2", "testing") as fuga:
         fuga.fuga_container.connection = connecting_s3.get_bucket("")
-        assert fuga.list() == ['1','2','3']
+        assert fuga.list() == ['1', '2', '3']
 
 
-def test_repr_working_for_fuga_container_without_container(monkeypatch, connecting_s3):
+def test_repr_working_for_fuga_container_without_container(monkeypatch,
+                                                           connecting_s3):
     monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
-    with FugaContainer("1","2") as fuga:
+    with FugaContainer("1", "2") as fuga:
         assert str(fuga) == '<FugaContainer>'
