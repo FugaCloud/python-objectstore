@@ -5,24 +5,27 @@ import base64
 import os.path
 
 
-class FugaInterface(object):
+class FugaContainer(object):
     """Class to interact with the Fuga Object Store."""
 
-    def __init__(self, fuga_container):
+    def __init__(self, fuga_connection):
         try:
-            if fuga_container.connection is None:
+            if fuga_connection.connection is None:
                 raise ValueError(
-                    'Make sure that fuga_container '
+                    'Make sure that fuga_connection '
                     'is connected to a container')
         except AttributeError:
             raise AttributeError(
-                'fuga_container object has to have a connection attribute')
+                'fuga_connection object has to have a connection attribute')
 
-        self.fuga_container = fuga_container
+        self.fuga_connection = fuga_connection
 
     @property
     def _connection(self):
-        return self.fuga_container.connection
+        return self.fuga_connection.connection
+
+    def __repr__(self):
+        return "<FugaContainer: {}>".format(self._connection.name)
 
     def list(self):
         """list everything in the container"""
@@ -37,7 +40,7 @@ class FugaInterface(object):
         if key is None:
             raise AttributeError(
                 'File {} not found in {}'.format(filename,
-                                                 self.fuga_container))
+                                                 self.fuga_connection))
         bin_file = key.get_contents_as_string()
         if return_hex:
             bin_file = base64.b64encode(bin_file).decode("utf-8")
@@ -79,17 +82,14 @@ class FugaInterface(object):
         return 'success'
 
 
-class FugaContainer(object):
+class FugaConnection(object):
     """Class to make a connection to the Fuga Object Store
      with a given container"""
 
-    def __init__(self, access_key, secret_key, container_name=None):
+    def __init__(self, access_key, secret_key, container_name):
         self.access_key = access_key
         self.secret_key = secret_key
-        if container_name is None:
-            self.connection = None
-        else:
-            self.make_connection(container_name)
+        self.make_connection(container_name)
 
     def make_connection(self, container_name):
         """make connection to given container"""
@@ -107,11 +107,12 @@ class FugaContainer(object):
         self.connection.connection.close()
         self.connection = None
 
+    def reset_connection(self, container_name):
+        self.close_connection()
+        self.make_connection(container_name)
+
     def __repr__(self):
-        if self.connection:
-            return "<FugaContainer: {}>".format(self.connection.name)
-        else:
-            return "<FugaContainer>"
+        return "<FugaConnection: {}>".format(self.connection.name)
 
     def __enter__(self):
         return self
@@ -119,11 +120,10 @@ class FugaContainer(object):
     def __exit__(self, *exc):
         self.access_key = None
         self.secret_key = None
-        if self.connection is not None:
-            self.close_connection()
+        self.close_connection()
 
 
-class FugaObjectStore(FugaInterface):
+class FugaObjectStore(FugaContainer):
     """FugaObjectStore context manager. 
     Makes it easier to connect to the Fuga ObjectStore. 
     Example:
@@ -134,16 +134,16 @@ class FugaObjectStore(FugaInterface):
 
         with open("local/path/where/file-to-download-from-objectstore", 'wb') as f:
             fuga.download(f, load_from='file-to-download-from-objectstore')
-    """ # noqa
+    """  # noqa
 
-    def __init__(self, access_key, secret_key, container_name=None):
-        cont = FugaContainer(access_key, secret_key,
-                             container_name=container_name)
-        self.fuga_interface = FugaInterface(cont)
-        self.fuga_container = cont
+    def __init__(self, access_key, secret_key, container_name):
+        cont = FugaConnection(access_key, secret_key,
+                              container_name=container_name)
+        self.fuga_container = FugaContainer(cont)
+        self.fuga_connection = cont
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
-        self.fuga_container.__exit__(*exc)
+        self.fuga_connection.__exit__(*exc)

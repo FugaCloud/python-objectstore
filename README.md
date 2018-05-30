@@ -1,6 +1,6 @@
 # Connecting to Fuga ObjectStore with Python
 
-A collection of Python Objects to connect to the Fuga ObjectStore. It is a small wrapper around boto. 
+A collection of Python Objects to connect to the Fuga ObjectStore. It is a small wrapper around boto.
 
 To get started, download the 'fuga_object_store.py' file or copy paste it in your project, install the requirements.txt and then:
 
@@ -36,29 +36,29 @@ with FugaObjectStore(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
         fuga.download(f, load_from='file-to-download-from-objectstore')
 ```
 
-FugaObjectStore class is a combination of the FugaInterface class and the FugaContainer class. The FugaInterface takes a FugaContainer-like object as its input and makes it possible to use its interface.
+FugaObjectStore class is a combination of the FugaContainer class and the FugaConnection class. The FugaContainer takes a FugaConnection-like object as its input and makes it possible to use its interface.
 
 ```python
-with FugaContainer(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
-    print(FugaInterface(fuga).list())
+with FugaConnection(ACCESS_KEY, SECRET_KEY, '<your-container-name>') as fuga:
+    print(FugaContainer(fuga).list())
 
 ```
 
 You will also be able to use these classes without context manager this way:
 
 ```python
-container = FugaContainer(ACCESS_KEY, SECRET_KEY)
+container = FugaConnection(ACCESS_KEY, SECRET_KEY)
 container.make_connection('<your-container-name>')
 
-interface = FugaInterface(container)
+interface = FugaContainer(container)
 print(interface.list())  # Or upload and download files
 
 container.close_connection()
 
 ```
 
-Run the tests with:
+Run the tests with flake8:
 
 ```bash
-PYTHONPATH=. pytest
+PYTHONPATH=. pytest && flake8 fuga_object_store.py tests/
 ```
