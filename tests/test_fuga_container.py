@@ -1,27 +1,37 @@
-from object_store_object import FugaContainer
+from io import BytesIO
+from types import SimpleNamespace
+
 import pytest
-from unittest.mock import patch, MagicMock, Mock, mock_open
-from boto.exception import S3ResponseError
+
+from fuga_object_store import FugaConnection, FugaContainer, FugaObjectStore
 
 
 class MockConnectionReturnValue(object):
 
-    def __init__(self, listvalue):
+    def __init__(self, listvalue=None, name=None):
+        if name is None:
+            self.name = 'test'
+        else:
+            self.name = name
         self.listvalue = listvalue
-        self.connection = MockFile("")
+        self.connection = MockKey("")
 
     def list(self):
         return self.listvalue
 
     def get_key(self, *args, **kwargs):
-        return MockFile(args[0])
+        if args[0] not in [x.name for x in self.listvalue]:
+            return None
+        return MockKey(args[0])
 
     def new_key(self, *args, **kwargs):
-        return MockFile(args[0])
-    
+        return MockKey(args[0])
+
+    def __repr__(self):
+        return '<MockConnection {}>'.format(self.name)
 
 
-class MockFile(object):
+class MockKey(object):
 
     def __init__(self, value):
         self.name = value
@@ -31,7 +41,7 @@ class MockFile(object):
         pass
 
     def get_contents_as_string(self):
-        return bytes([0,0,0,0,0,0,0,0,0,0,0,0,0])
+        return bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     def set_contents_from_file(self, *args, **kwargs):
         pass
@@ -39,252 +49,126 @@ class MockFile(object):
     def close(self):
         pass
 
-@pytest.mark.skip
-def test_forbidden_not_access_keys(mock_boto):
-    with pytest.raises(S3ResponseError):
-        FugaContainer("", "").set_container("test")
 
+@pytest.fixture
+def connecting_s3():
+    return_object = SimpleNamespace()
+    return_object.get_bucket = lambda name: MockConnectionReturnValue(
+        listvalue=[MockKey('1'), MockKey('2'), MockKey('3')], name=name
+    )
+    return lambda *args, **kwargs: return_object
 
-@patch('object_store_object.boto')
-def test_set_container_sets_container(mock_boto):
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: 'testing'
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga = FugaContainer("", "")
-    fuga.set_container("testing")
-    assert fuga.container == 'testing'
 
+@pytest.fixture
+def fuga_container(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    fuga = FugaConnection("1", "2", "testing")
+    return fuga
 
-@patch('object_store_object.boto')
-def test_get_container_does_not_set_container(mock_boto):
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: 'testing'
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga = FugaContainer("", "")
-    fuga.get_container("testing")
-    assert fuga.container != 'testing'
 
+def test_context_manager_deletes_keys_with_container(monkeypatch,
+                                                     connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
 
-def test_getfile_none_container_raises_error():
-    fuga = FugaContainer("", "")
+    with FugaConnection("1", "2", "") as fuga:
+        assert fuga.connection is not None
+        assert fuga.secret_key == "2"
+        assert fuga.access_key == "1"
 
-    with pytest.raises(AttributeError):
-        fuga.get_file("")
-
-
-def test_getfiles_none_container_raises_error():
-    fuga = FugaContainer("", "")
-
-    with pytest.raises(AttributeError):
-        fuga.get_files()
-
-
-def test_delete_file_none_container_raises_error():
-    fuga = FugaContainer("", "")
-
-    with pytest.raises(AttributeError):
-        fuga.delete_file("")
-
-
-def test_save_file_none_container_raises_error():
-    fuga = FugaContainer("", "")
-
-    with pytest.raises(AttributeError):
-        fuga.save_file("")
-
-
-def test_upload_file_none_container_raises_error():
-    fuga = FugaContainer("", "")
-
-    with pytest.raises(AttributeError):
-        fuga.upload_file("")
-
-def test_list_files_none_container_raises_error():
-    fuga = FugaContainer("", "")
-
-    with pytest.raises(AttributeError):
-        fuga.list_files()
-
-def test_list_all_the_functions():
-
-    assert set(FugaContainer.list_functions()) == {'delete_file', 'get_container',
-                                                   'get_file', 'get_files',
-                                                   'list_functions', 'post_file',
-                                                   'save_file', 'set_container', 
-                                                   'upload_file', 'list_files'}
-
-@patch('object_store_object.boto')
-def test_fuga_container_repr_function(mock_boto):
-    fuga = FugaContainer("", "")
-    assert str(fuga) == "FugaContainer(access_key="", secret_key=<secret_key>)"
-
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: 'test'
-    mock_boto.connect_s3.return_value = mock_connect
-
-    fuga.set_container("test")
-    assert str(fuga) == "FugaContainer(access_key="", secret_key=<secret_key>) with container test"
-
-
-@patch('object_store_object.boto')
-def test_list_files_function(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-
-    assert fuga.list_files("") == ['1', '2', '3']
-    fuga.set_container("")
-    assert fuga.list_files() == ['1', '2', '3']
-
-@patch('object_store_object.boto')
-def test_delete_file_succeeds(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    assert fuga.delete_file("1", "") == "'1' deleted"
-    fuga.set_container("")
-    assert fuga.delete_file("2") == "'2' deleted"
-
-
-@patch('object_store_object.boto')
-def test_delete_file_fails(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    with pytest.raises(AttributeError):
-        fuga.delete_file("4", "")
-    fuga.set_container("")
-    with pytest.raises(AttributeError):
-        fuga.delete_file("4")
-
-@patch('object_store_object.boto')
-def test_save_file_succeeds(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    with patch("builtins.open", mock_open()) as mock_file:
-        fuga.save_file("1")
-
-@patch('object_store_object.boto')
-def test_get_file(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    with patch("builtins.open", mock_open()) as mock_file:
-        fuga.get_file("1")
-
-
-@patch('object_store_object.boto')
-def test_get_file_doesnt_exist(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    with pytest.raises(AttributeError):
-        fuga.get_file("4")
-
-
-@patch('object_store_object.boto')
-@patch('object_store_object.basename')
-def test_upload_file_works(mock_basename, mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    with patch("builtins.open", mock_open()) as mock_file:
-        fuga.upload_file("4")
-
-
-@patch('object_store_object.boto')
-def test_get_files_no_limit(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    fuga.get_files()
-
-@patch('object_store_object.boto')
-def test_get_files_with_limit(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    assert len(fuga.get_files(limit=2)) == 2
-
-@patch('object_store_object.boto')
-def test_post_file(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    new_file = MockFile('testintest')
-    assert fuga.post_file(new_file) == 'success'
-
-@patch('object_store_object.boto')
-def test_post_file_without_name_raises_attribute_error(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    fuga.set_container("")
-
-    new_file = MockFile('')
-    with pytest.raises(AttributeError):
-        fuga.post_file(new_file)
-
-
-@patch('object_store_object.boto')
-def test_contextmanager_connection(mock_boto):
-    fuga = FugaContainer("", "")
-
-    mock_connection = MockConnectionReturnValue(listvalue=[MockFile('1'), MockFile('2'), MockFile('3')])
-    mock_connect = Mock()
-    mock_connect.get_bucket.side_effect = lambda x: mock_connection
-    mock_boto.connect_s3.return_value = mock_connect
-    with FugaContainer("", "") as fuga:
-        fuga.set_container("testing")
-
-    assert fuga.container is None
+    assert fuga.connection is None
     assert fuga.secret_key is None
     assert fuga.access_key is None
+
+
+def test_list_returns_correct_items(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    with FugaConnection("1", "2", "test-container") as fuga:
+        assert FugaContainer(fuga).list() == ['1', '2', '3']
+
+
+def test_get_returns_correctly_hex(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    with FugaConnection("1", "2", "test-container") as fuga:
+        assert FugaContainer(fuga).get("3") == "AAAAAAAAAAAAAAAAAA=="
+
+
+def test_get_returns_correctly_bin(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    with FugaConnection("1", "2", "test-container") as fuga:
+        assert FugaContainer(fuga).get("3", return_hex=False) == bytes(
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+
+def test_contextmanager_is_the_same_as_object(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    fuga1 = FugaConnection("1", "2", "test-container")
+    with FugaConnection("1", "2", "test-container") as fuga2:
+        assert dir(fuga1) == dir(fuga2)
+        assert fuga1.access_key == fuga2.access_key
+        assert fuga1.secret_key == fuga2.secret_key
+        assert fuga1.connection.name == fuga2.connection.name
+
+
+def test_connection_can_be_reset_correctly(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+    fuga = FugaConnection("1", "2", "test-container")
+    assert '<FugaConnection: test-container>' == str(fuga)
+    fuga.reset_connection('kaasmarkt')
+    assert '<FugaConnection: kaasmarkt>' == str(fuga)
+
+
+def test_delete_correctly(fuga_container):
+    assert FugaContainer(fuga_container).delete('1') == "'1' deleted"
+
+
+def test_upload_file_success(fuga_container):
+    with BytesIO(b'hallo') as f:
+        f.mode = 'rb'
+        FugaContainer(fuga_container).upload(f, 'testing') == 'success'
+        f.name = 'testing'
+        FugaContainer(fuga_container).upload(f) == 'success'
+
+
+def test_upload_file_fails_on_using_non_binairy_file(fuga_container):
+    with BytesIO(b'hallo') as f:
+        f.mode = 'r'
+        with pytest.raises(IOError):
+            FugaContainer(fuga_container).upload(f, 'testing')
+
+
+def test_download_file_success(fuga_container):
+    with BytesIO(b'') as f:
+        f.mode = 'wb'
+        FugaContainer(fuga_container).download(f, load_from='1') == 'success'
+        f.name = '2'
+        FugaContainer(fuga_container).download(f) == 'success'
+
+
+def test_download_file_fails_on_using_binairy_file(fuga_container):
+    with BytesIO(b'') as f:
+        f.mode = 'w'
+        with pytest.raises(IOError):
+            FugaContainer(fuga_container).download(f, 'testing')
+
+
+def test_get_file_fails_on_not_existing(fuga_container):
+    with pytest.raises(AttributeError):
+        FugaContainer(fuga_container).get('testing')
+
+
+def test_container_init_fail_when_connection_attribute_is_none(fuga_container):
+    fuga_container.connection = None
+    with pytest.raises(ValueError):
+        FugaContainer(fuga_container)
+
+
+def test_container_init_fails_without_connection_attribute():
+    with pytest.raises(AttributeError):
+        FugaContainer("")
+
+
+def test_object_store_works(monkeypatch, connecting_s3):
+    monkeypatch.setattr("fuga_object_store.boto.connect_s3", connecting_s3)
+
+    with FugaObjectStore("1", "2", "testing") as fuga:
+        assert fuga.list() == ['1', '2', '3']
